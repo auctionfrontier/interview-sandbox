@@ -1,114 +1,196 @@
-import React, { useMemo, useState } from "react";
-import { observer } from "mobx-react-lite";
-import { AuctionStore } from "./store/auctionStore";
+import React, { useEffect, useState } from "react";
+import { useAuctionStore } from "./store/auctionStore";
+import { useAutoBidders } from "./hooks/useAutoBidders";
 
-const App = observer(() => {
-  const store = useMemo(() => new AuctionStore(), []);
-  const [amount, setAmount] = useState(0);
-  const [bidderId, setBidderId] = useState("lane-99");
+const App = () => {
+  const {
+    connected,
+    state,
+    currentVehicle,
+    users,
+    initSocket,
+    placeBid
+  } = useAuctionStore();
 
-  const currentBid = store.highestBids[store.currentVehicleId]?.amount ?? 0;
-  const minNextBid = currentBid + 100;
+  const [myUserId] = useState("user-1"); // You are always user-1
+  const myUser = users.find(u => u.id === myUserId);
 
-  const onSubmit = (event) => {
-    event.preventDefault();
-    const parsed = Number(amount);
-    if (!Number.isFinite(parsed)) return;
-    store.placeBid(parsed, bidderId.trim() || "lane-99");
+  // Start automated bidders (user-2 and user-3)
+  useAutoBidders();
+
+  // Initialize WebSocket on mount
+  useEffect(() => {
+    initSocket();
+  }, [initSocket]);
+
+  const currentBid = currentVehicle?.currentBid || 0;
+  const targetPrice = currentVehicle?.targetPrice || 0;
+  const startingBid = currentVehicle?.startingBid || 0;
+  const isNewItem = currentBid === startingBid;
+
+  // Am I winning?
+  const amIWinning = currentVehicle?.currentWinner === myUserId;
+  const isSold = !!currentVehicle?.winner;
+  const winner = users.find(u => u.id === currentVehicle?.winner);
+
+  // Calculate next bid increment - fixed $100
+  const nextBidAmount = currentBid + 100;
+
+  const handleBid = async () => {
+    if (isSold || state === "ENDED" || !connected) {
+      console.log("Bid blocked:", { isSold, state, connected });
+      return;
+    }
+
+    // Check if I have enough credit
+    if (myUser && myUser.availableCredit < nextBidAmount) {
+      alert(`Insufficient credit! You have $${myUser.availableCredit.toLocaleString()} available.`);
+      return;
+    }
+
+    console.log("Placing bid:", { userId: myUserId, amount: nextBidAmount });
+    const result = await placeBid(myUserId, nextBidAmount);
+    console.log("Bid result:", result);
   };
 
+  if (!currentVehicle) {
+    return (
+      <div className="auction-container">
+        <div className="loading">Loading auction...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="page">
-      <header className="header">
-        <div>
-          <p className="eyebrow">Auction Frontier (Velocicast)</p>
-          <h1>Mock Simulcast Auction</h1>
-          <p className="subhead">
-            Evaluate concurrency, state consistency, and low-latency updates.
-          </p>
+    <div className="auction-container">
+      <header className="auction-header">
+        <div className="connection-status">
+          <div className={`status-dot ${connected ? "online" : "offline"}`}></div>
+          <span>{connected ? "Live" : "Disconnected"}</span>
         </div>
-        <div className={`status ${store.connected ? "online" : "offline"}`}>
-          {store.connected ? "Connected" : "Disconnected"}
+        <div className="auction-info">
+          <span>Auction #{currentVehicle.id}</span>
+          {myUser && (
+            <span className="credit-display">
+              Available Credit: ${myUser.availableCredit?.toLocaleString()}
+            </span>
+          )}
         </div>
       </header>
 
-      <main className="layout">
-        <section className="panel">
-          <h2>Lane Snapshot</h2>
-          <div className="snapshot">
-            <div>
-              <span>State</span>
-              <strong>{store.state}</strong>
-            </div>
-            <div>
-              <span>Current Vehicle</span>
-              <strong>{store.currentVehicle?.make || "-"}</strong>
-            </div>
-            <div>
-              <span>Highest Bid</span>
-              <strong>${currentBid.toLocaleString()}</strong>
-            </div>
-          </div>
+      <main className="auction-main">
+        {/* Vehicle Info Section */}
+        <section className="vehicle-section">
+          <div className="vehicle-number">#{currentVehicle.id}</div>
+          <h1 className="vehicle-title">
+            {currentVehicle.year} {currentVehicle.make} {currentVehicle.model}
+          </h1>
+          <p className="vehicle-vin">VIN: {currentVehicle.vin}</p>
+        </section>
 
-          <div className="vehicle">
-            {store.currentVehicle ? (
+        {/* Vehicle Image */}
+        <section className="vehicle-image-section">
+          <img
+            src={`/images/${currentVehicle.id}.jpeg`}
+            alt={`${currentVehicle.year} ${currentVehicle.make} ${currentVehicle.model}`}
+            onError={(e) => {
+              e.target.parentElement.style.display = 'none';
+            }}
+          />
+        </section>
+
+        {/* Bidding Display */}
+        <section className="bid-display">
+          {/* Left Side - Asking/Your Status */}
+          <div className={`bid-panel left ${amIWinning ? "winning" : "asking"}`}>
+            {isSold ? (
               <>
-                <h3>
-                  {store.currentVehicle.year} {store.currentVehicle.make}{" "}
-                  {store.currentVehicle.model}
-                </h3>
-                <p>VIN: {store.currentVehicle.vin}</p>
-                <p>Starting bid: ${store.currentVehicle.startingBid}</p>
-                <p>
-                  Reserve: {store.currentVehicle.reservePrice ?? "No reserve"}
-                </p>
+                <div className="label">SOLD</div>
+                <div className="amount">${currentBid.toLocaleString()}</div>
+                {currentVehicle.winner === myUserId ? (
+                  <div className="status-text">You won!</div>
+                ) : (
+                  <div className="status-text">Better luck next time</div>
+                )}
+              </>
+            ) : amIWinning ? (
+              <>
+                <div className="status-text">You are the high bidder</div>
+                <div className="amount">${currentBid.toLocaleString()}</div>
+              </>
+            ) : isNewItem ? (
+              <>
+                <div className="label">ASKING</div>
+                <div className="amount">${startingBid.toLocaleString()}</div>
               </>
             ) : (
-              <p>No vehicle loaded.</p>
+              <>
+                <div className="label">CURRENT BID</div>
+                <div className="amount">${currentBid.toLocaleString()}</div>
+              </>
+            )}
+          </div>
+
+          {/* Right Side - Bid Button or Winning Info */}
+          <div className={`bid-panel right ${amIWinning ? "my-winning" : "bid-action"}`}>
+            {isSold ? (
+              <>
+                <div className="label">WINNER</div>
+                <div className="winner-badge">
+                  <span className="winner-icon">👤</span>
+                  <span className="winner-name">{winner?.badge || "Unknown"}</span>
+                </div>
+                <div className="amount">${currentBid.toLocaleString()}</div>
+              </>
+            ) : amIWinning ? (
+              <>
+                <div className="label">WINNING</div>
+                <div className="winner-badge">
+                  <span className="winner-icon">👤</span>
+                  <span className="winner-name">{myUser?.badge || "You"}</span>
+                </div>
+                <div className="amount">${currentBid.toLocaleString()}</div>
+              </>
+            ) : (
+              <button
+                className="bid-button"
+                onClick={handleBid}
+                disabled={!connected || state === "ENDED"}
+              >
+                <div className="bid-label">BID</div>
+                <div className="bid-amount">${nextBidAmount.toLocaleString()}</div>
+              </button>
             )}
           </div>
         </section>
 
-        <section className="panel">
-          <h2>Place a Bid</h2>
-          <form className="bid-form" onSubmit={onSubmit}>
-            <label>
-              Bidder ID
-              <input
-                value={bidderId}
-                onChange={(event) => setBidderId(event.target.value)}
-                placeholder="lane-99"
-              />
-            </label>
-            <label>
-              Bid Amount
-              <input
-                type="number"
-                min={minNextBid}
-                step={100}
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
-            </label>
-            <button type="submit">Submit Bid</button>
-            <p className="hint">Next minimum: ${minNextBid.toLocaleString()}</p>
-          </form>
-        </section>
+        {/* Progress to Target */}
+        {!isSold && (
+          <section className="progress-section">
+            <div className="progress-info">
+              <span>Target Price: ${targetPrice.toLocaleString()}</span>
+              <span>{Math.round((currentBid / targetPrice) * 100)}% to target</span>
+            </div>
+            <div className="progress-bar">
+              <div
+                className="progress-fill"
+                style={{ width: `${Math.min((currentBid / targetPrice) * 100, 100)}%` }}
+              ></div>
+            </div>
+          </section>
+        )}
 
-        <section className="panel">
-          <h2>Recent Events</h2>
-          <ul className="events">
-            {store.events.map((event) => (
-              <li key={event.timestamp}>
-                <span>{event.type}</span>
-                <pre>{JSON.stringify(event.payload, null, 2)}</pre>
-              </li>
-            ))}
-          </ul>
-        </section>
+        {/* Countdown when sold */}
+        {isSold && (
+          <section className="countdown-section">
+            <div className="countdown-message">
+              Next vehicle in 10 seconds...
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );
-});
+};
 
 export default App;
