@@ -3,10 +3,10 @@ const defaultBidders = ["lane-7", "lane-12", "remote-44", "remote-58"];
 /**
  * Starts a timer that simulates external bids on the current vehicle.
  * @param {{
- *   engine: { getSnapshot: () => object, applyBid: (bid: object) => Array<object> },
+ *   engine: { getSnapshot: () => object, applyBid: (bid: {userId: string, amount: number}) => object },
  *   intervalMs?: number,
  *   bidders?: string[],
- *   onEvents?: (events: Array<object>) => void
+ *   onResult?: (result: object) => void
  * }} options
  * @returns {() => void} stop function
  */
@@ -14,27 +14,30 @@ const startBidStreamSimulator = ({
   engine,
   intervalMs = 1500,
   bidders = defaultBidders,
-  onEvents
+  onResult
 }) => {
   const timer = setInterval(() => {
     const snapshot = engine.getSnapshot();
-    const vehicleId = snapshot.currentVehicleId;
-    if (!vehicleId) return;
+    const currentVehicle = snapshot.currentVehicle;
+    if (!currentVehicle) return;
 
-    const currentBid = snapshot.highestBids[vehicleId]?.amount ?? 0;
+    const currentBid = currentVehicle.currentBid ?? currentVehicle.startingBid ?? 0;
     const increment = Math.ceil(Math.random() * 500);
+    const availableUsers = snapshot.users || [];
+    if (availableUsers.length === 0) return;
+    const bidderBadge = bidders[Math.floor(Math.random() * bidders.length)];
+    const bidder =
+      availableUsers.find((user) => user.badge === bidderBadge) ??
+      availableUsers[Math.floor(Math.random() * availableUsers.length)];
 
     const bid = {
-      id: `sim-${Date.now()}`,
-      vehicleId,
-      amount: currentBid + increment,
-      bidderId: bidders[Math.floor(Math.random() * bidders.length)],
-      timestamp: Date.now()
+      userId: bidder.id,
+      amount: currentBid + increment
     };
 
     try {
-      const events = engine.applyBid(bid);
-      if (onEvents) onEvents(events);
+      const result = engine.applyBid(bid);
+      if (onResult) onResult(result);
     } catch {
       // Swallow errors so the simulator doesn't crash the server while logic is incomplete.
     }

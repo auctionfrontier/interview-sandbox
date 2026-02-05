@@ -43,7 +43,8 @@ const seedVehicles = [
     currentWinner: null,
     winner: null,
     soldAt: null,
-    state: VehicleState.PENDING
+    state: VehicleState.PENDING,
+    bids: [],
   },
   {
     id: "veh-002",
@@ -57,7 +58,8 @@ const seedVehicles = [
     currentWinner: null,
     winner: null,
     soldAt: null,
-    state: VehicleState.PENDING
+    state: VehicleState.PENDING,
+    bids: [],
   },
   {
     id: "veh-003",
@@ -71,7 +73,8 @@ const seedVehicles = [
     currentWinner: null,
     winner: null,
     soldAt: null,
-    state: VehicleState.PENDING
+    state: VehicleState.PENDING,
+    bids: [],
   }
 ];
 

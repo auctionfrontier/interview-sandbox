@@ -3,8 +3,9 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const { createServer } = require("node:http");
 const { Server: SocketIOServer } = require("socket.io");
-const { mysqlPool } = require("./config/mysql");
-const { redisClient } = require("./config/redis");
+// If containerization is available, can add these in
+// const { mysqlPool } = require("./config/mysql");
+// const { redisClient } = require("./config/redis");
 const { createAuctionEngine } = require("./auctionEngine");
 const { MockAuctionStore } = require("./mockAuctionStore");
 
@@ -15,29 +16,30 @@ const app = express();
 app.use(cors()); // Enable CORS for all routes
 app.use(express.json());
 
-app.get("/health", async (_req, res) => {
-  const checks = {
-    mysql: false,
-    redis: false
-  };
+// uncomment this if redis / mysql is available
+// app.get("/health", async (_req, res) => {
+//   const checks = {
+//     mysql: false,
+//     redis: false
+//   };
 
-  try {
-    const [rows] = await mysqlPool.query("SELECT 1 AS ok");
-    checks.mysql = Array.isArray(rows);
-  } catch (err) {
-    console.error("MySQL health check failed:", err.message);
-  }
+//   try {
+//     const [rows] = await mysqlPool.query("SELECT 1 AS ok");
+//     checks.mysql = Array.isArray(rows);
+//   } catch (err) {
+//     console.error("MySQL health check failed:", err.message);
+//   }
 
-  try {
-    await redisClient.ping();
-    checks.redis = true;
-  } catch (err) {
-    console.error("Redis health check failed:", err.message);
-  }
+//   try {
+//     await redisClient.ping();
+//     checks.redis = true;
+//   } catch (err) {
+//     console.error("Redis health check failed:", err.message);
+//   }
 
-  const ok = checks.mysql && checks.redis;
-  res.status(ok ? 200 : 500).json({ ok, checks });
-});
+//   const ok = checks.mysql && checks.redis;
+//   res.status(ok ? 200 : 500).json({ ok, checks });
+// });
 
 app.get("/", (_req, res) => {
   res.json({ message: "Backend is running." });
@@ -125,7 +127,7 @@ app.post("/bid", async (req, res) => {
 
     res.json(result);
   } catch (error) {
-    console.error("[BID ERROR]", error.message);
+    console.error("[BID ERROR]", error);
     console.error("This is expected if applyBid() is not implemented yet.");
     res.status(500).json({
       accepted: false,
