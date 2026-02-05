@@ -10,6 +10,7 @@ const { startBidStreamSimulator } = require("./bidStreamSimulator");
 
 dotenv.config();
 
+// Express API and Socket.IO share the same HTTP server instance.
 const app = express();
 app.use(express.json());
 
@@ -48,14 +49,23 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
+// In-memory auction state for the mock interview exercise.
 const store = new MockAuctionStore();
 const engine = createAuctionEngine(store);
 
+/**
+ * Broadcasts engine events to all connected clients.
+ * @param {Array<{type: string, payload: unknown, timestamp: number}>} events
+ */
 const broadcastEvents = (events) => {
   if (!events || events.length === 0) return;
   events.forEach((event) => io.emit("auction:event", event));
 };
 
+/**
+ * Handles a bid submission and emits events (or error) to clients.
+ * @param {{id: string, vehicleId: string, amount: number, bidderId: string, timestamp: number}} bid
+ */
 const handleBid = (bid) => {
   try {
     const events = engine.applyBid(bid);
@@ -85,6 +95,7 @@ io.on("connection", (socket) => {
   });
 });
 
+// Simulate external bidder traffic to create concurrency pressure.
 startBidStreamSimulator({
   engine,
   onEvents: broadcastEvents

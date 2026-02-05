@@ -1,5 +1,6 @@
 const { AuctionState } = require("./models");
 
+/** @type {Array<{id: string, year: number, make: string, model: string, vin: string, startingBid: number, reservePrice?: number}>} */
 const seedVehicles = [
   {
     id: "veh-001",
@@ -29,7 +30,13 @@ const seedVehicles = [
   }
 ];
 
+/**
+ * In-memory store holding the auction snapshot used by the mock engine.
+ */
 class MockAuctionStore {
+  /**
+   * @param {Array<{id: string, year: number, make: string, model: string, vin: string, startingBid: number, reservePrice?: number}>} [vehicles]
+   */
   constructor(vehicles = seedVehicles) {
     this.vehicles = vehicles;
     this.state = AuctionState.LIVE;
@@ -39,6 +46,10 @@ class MockAuctionStore {
     );
   }
 
+  /**
+   * Returns a serializable snapshot for initial client hydration.
+   * @returns {{vehicles: typeof this.vehicles, state: string, currentVehicleId: string, highestBids: Record<string, object|null>}}
+   */
   getSnapshot() {
     return {
       vehicles: this.vehicles,

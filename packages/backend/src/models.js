@@ -1,9 +1,19 @@
+/**
+ * High-level auction state transitions for the mock simulcast.
+ * @readonly
+ * @enum {string}
+ */
 const AuctionState = {
   PREVIEW: "PREVIEW",
   LIVE: "LIVE",
   ENDED: "ENDED"
 };
 
+/**
+ * Event types emitted to clients over the socket.
+ * @readonly
+ * @enum {string}
+ */
 const AuctionEventType = {
   AUCTION_SNAPSHOT: "AUCTION_SNAPSHOT",
   BID_ACCEPTED: "BID_ACCEPTED",

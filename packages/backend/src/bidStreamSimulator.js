@@ -1,5 +1,15 @@
 const defaultBidders = ["lane-7", "lane-12", "remote-44", "remote-58"];
 
+/**
+ * Starts a timer that simulates external bids on the current vehicle.
+ * @param {{
+ *   engine: { getSnapshot: () => object, applyBid: (bid: object) => Array<object> },
+ *   intervalMs?: number,
+ *   bidders?: string[],
+ *   onEvents?: (events: Array<object>) => void
+ * }} options
+ * @returns {() => void} stop function
+ */
 const startBidStreamSimulator = ({
   engine,
   intervalMs = 1500,
