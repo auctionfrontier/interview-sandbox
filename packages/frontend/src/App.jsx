@@ -13,10 +13,11 @@ const App = () => {
   } = useAuctionStore();
 
   const [myUserId] = useState("user-1"); // You are always user-1
+  const [simulationEnabled, setSimulationEnabled] = useState(false);
   const myUser = users.find(u => u.id === myUserId);
 
   // Start automated bidders (user-2 and user-3)
-  useAutoBidders();
+  useAutoBidders(simulationEnabled);
 
   // Initialize WebSocket on mount
   useEffect(() => {
@@ -75,6 +76,14 @@ const App = () => {
               Available Credit: ${myUser.availableCredit?.toLocaleString()}
             </span>
           )}
+          <button
+            className={`simulation-toggle ${simulationEnabled ? "enabled" : "disabled"}`}
+            onClick={() => setSimulationEnabled(!simulationEnabled)}
+            title={simulationEnabled ? "Disable auto-bidders" : "Enable auto-bidders"}
+          >
+            <span className="toggle-icon">{simulationEnabled ? "⏸" : "▶"}</span>
+            <span className="toggle-text">Auto-Bidders: {simulationEnabled ? "ON" : "OFF"}</span>
+          </button>
         </div>
       </header>
 

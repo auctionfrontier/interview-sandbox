@@ -4,8 +4,9 @@ import { useAuctionStore } from "../store/auctionStore";
 /**
  * Hook that simulates automated bidders (user-2 and user-3)
  * They will randomly bid on the current vehicle to create competition
+ * @param {boolean} enabled - Whether auto-bidders are enabled
  */
-export const useAutoBidders = () => {
+export const useAutoBidders = (enabled = true) => {
   const { currentVehicle, users, placeBid, connected } = useAuctionStore();
   const timersRef = useRef([]);
 
@@ -14,9 +15,16 @@ export const useAutoBidders = () => {
     timersRef.current.forEach(timer => clearTimeout(timer));
     timersRef.current = [];
 
+    if (!enabled) {
+      console.log("[Auto-Bidders] Simulation disabled");
+      return;
+    }
+
     if (!connected || !currentVehicle || currentVehicle.winner) {
       return; // Don't bid if not connected, no vehicle, or vehicle is sold
     }
+
+    console.log("[Auto-Bidders] Simulation enabled - starting auto-bidders");
 
     // Auto bidders (user-2 and user-3)
     const autoBidders = ["user-2", "user-3"];
@@ -68,12 +76,12 @@ export const useAutoBidders = () => {
       scheduleNextBid();
     });
 
-    // Cleanup timers on unmount or when vehicle changes
+    // Cleanup timers on unmount or when vehicle/enabled changes
     return () => {
       timersRef.current.forEach(timer => clearTimeout(timer));
       timersRef.current = [];
     };
-  }, [currentVehicle?.id, connected, currentVehicle?.winner]);
+  }, [currentVehicle?.id, connected, currentVehicle?.winner, enabled]);
 
   return null;
 };
