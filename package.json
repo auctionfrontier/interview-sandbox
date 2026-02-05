@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start-server": "podman compose -f docker-compose.yml up"
+    "start-server": "echo \"run the docker-compose.yml with docker, podman, etc...\""
   },
   "workspaces": ["packages/frontend", "packages/backend"],
   "repository": {
