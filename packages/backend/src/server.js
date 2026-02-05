@@ -1,20 +1,17 @@
 const express = require("express");
 const dotenv = require("dotenv");
-const SocketIO = require('socket.io');
+const { createServer } = require("node:http");
+const { Server: SocketIOServer } = require("socket.io");
 const { mysqlPool } = require("./config/mysql");
 const { redisClient } = require("./config/redis");
-
-const {createServer} = require("node:http");
+const { createAuctionEngine } = require("./auctionEngine");
+const { MockAuctionStore } = require("./mockAuctionStore");
+const { startBidStreamSimulator } = require("./bidStreamSimulator");
 
 dotenv.config();
 
-const ws = new SocketIO.Server(createServer({
-  port: process.env.WS_PORT || 4000,
-}), {
-
-});
-
 const app = express();
+app.use(express.json());
 
 app.get("/health", async (_req, res) => {
   const checks = {
@@ -44,15 +41,59 @@ app.get("/", (_req, res) => {
   res.json({ message: "Backend is running." });
 });
 
-const port = Number(process.env.PORT) || 3000;
-
-app.listen(port, () => {
-  console.log(`Backend listening on port ${port}`);
+const httpServer = createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "*"
+  }
 });
 
-ws.on("connection", (socket) => {
-  socket.emit("connected", { status: "hi there" });
-})
+const store = new MockAuctionStore();
+const engine = createAuctionEngine(store);
+
+const broadcastEvents = (events) => {
+  if (!events || events.length === 0) return;
+  events.forEach((event) => io.emit("auction:event", event));
+};
+
+const handleBid = (bid) => {
+  try {
+    const events = engine.applyBid(bid);
+    broadcastEvents(events);
+  } catch (error) {
+    io.emit("auction:event", {
+      type: "ERROR",
+      payload: {
+        message: error.message,
+        bid
+      },
+      timestamp: Date.now()
+    });
+  }
+};
+
+io.on("connection", (socket) => {
+  socket.emit("auction:snapshot", engine.getSnapshot());
+
+  socket.on("bid:place", (payload) => {
+    const bid = {
+      ...payload,
+      id: `user-${Date.now()}`,
+      timestamp: Date.now()
+    };
+    handleBid(bid);
+  });
+});
+
+startBidStreamSimulator({
+  engine,
+  onEvents: broadcastEvents
+});
+
+const port = Number(process.env.PORT) || 3000;
+httpServer.listen(port, () => {
+  console.log(`Backend listening on port ${port}`);
+});
 
 process.on("SIGINT", async () => {
   await redisClient.quit();

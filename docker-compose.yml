@@ -1,6 +1,8 @@
 services:
   backend:
     build: .
+    working_dir: /app/packages/backend
+    command: ["npx", "nodemon", "--watch", "src", "--ext", "js,json", "src/server.js"]
     ports:
       - "3000:3000"
     environment:
