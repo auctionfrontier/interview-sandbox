@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node src/server.js",
-    "test": "vitest run"
+    "test": "tap"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -17,6 +17,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.9",
-    "vitest": "^2.1.8"
+    "tap": "^18.7.0"
   }
 }
