@@ -1,0 +1,21 @@
+{
+  "name": "interview-sandbox",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start-server": "podman compose -f docker-compose.yml up"
+  },
+  "workspaces": ["packages/frontend", "packages/backend"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ol-velocicast/interview-sandbox.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ol-velocicast/interview-sandbox/issues"
+  },
+  "homepage": "https://github.com/ol-velocicast/interview-sandbox#readme",
+  "description": ""
+}
