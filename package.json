@@ -7,7 +7,7 @@
     "backend": "cd packages/backend && npm run dev",
     "frontend": "cd packages/frontend && npm run dev",
     "install-all": "cd packages/backend && npm install && cd ../frontend && npm install",
-    "start-server": "echo \"run the docker-compose.yml with docker, podman, etc...\""
+    "start-server": "cd packages/backend && npm run dev"
   },
   "workspaces": ["packages/frontend", "packages/backend"],
   "repository": {

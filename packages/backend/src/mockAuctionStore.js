@@ -44,7 +44,9 @@ const seedVehicles = [
     winner: null,
     soldAt: null,
     state: VehicleState.PENDING,
-    bids: [],
+    version: 1,
+    updatedAt: null,
+    bids: []
   },
   {
     id: "veh-002",
@@ -59,7 +61,9 @@ const seedVehicles = [
     winner: null,
     soldAt: null,
     state: VehicleState.PENDING,
-    bids: [],
+    version: 1,
+    updatedAt: null,
+    bids: []
   },
   {
     id: "veh-003",
@@ -74,9 +78,42 @@ const seedVehicles = [
     winner: null,
     soldAt: null,
     state: VehicleState.PENDING,
-    bids: [],
+    version: 1,
+    updatedAt: null,
+    bids: []
   }
 ];
+
+const cloneUser = (user) => ({
+  id: user.id,
+  badge: user.badge,
+  name: user.name,
+  creditLimit: user.creditLimit,
+  creditUsed: user.creditUsed
+});
+
+const cloneVehicle = (vehicle) => ({
+  id: vehicle.id,
+  year: vehicle.year,
+  make: vehicle.make,
+  model: vehicle.model,
+  vin: vehicle.vin,
+  startingBid: vehicle.startingBid,
+  targetPrice: vehicle.targetPrice,
+  currentBid: vehicle.currentBid,
+  currentWinner: vehicle.currentWinner,
+  winner: vehicle.winner,
+  soldAt: vehicle.soldAt,
+  state: vehicle.state,
+  version: vehicle.version,
+  updatedAt: vehicle.updatedAt,
+  bids: (vehicle.bids || []).map((bid) => ({ ...bid }))
+});
+
+const createUserSnapshot = (user) => ({
+  ...cloneUser(user),
+  availableCredit: user.creditLimit - user.creditUsed
+});
 
 /**
  * In-memory store holding the auction state.
@@ -86,40 +123,37 @@ class MockAuctionStore {
   constructor(users = seedUsers, vehicles = seedVehicles) {
     this.customerId = "cust-1";
     this.eventId = "event-1";
-    this.users = users;
-    this.vehicles = vehicles;
+    this.users = users.map(cloneUser);
+    this.vehicles = vehicles.map(cloneVehicle);
     this.currentVehicleIndex = 0;
     this.state = AuctionState.LIVE;
+    this.snapshotVersion = 1;
 
     // Set first vehicle as active
     if (this.vehicles.length > 0) {
       this.vehicles[0].state = VehicleState.ACTIVE;
+      this.vehicles[0].updatedAt = Date.now();
     }
   }
 
-  /**
-   * Get current active vehicle
-   * @returns {object|null}
-   */
   getCurrentVehicle() {
     return this.vehicles[this.currentVehicleIndex] || null;
   }
 
-  /**
-   * Get user by ID
-   * @param {string} userId
-   * @returns {object|null}
-   */
   getUser(userId) {
-    return this.users.find(u => u.id === userId) || null;
+    return this.users.find((user) => user.id === userId) || null;
   }
 
-  /**
-   * Check if user has sufficient credit for bid amount
-   * @param {string} userId
-   * @param {number} amount
-   * @returns {boolean}
-   */
+  getUserSnapshot(userId) {
+    const user = this.getUser(userId);
+    return user ? createUserSnapshot(user) : null;
+  }
+
+  getVehicleSnapshot(vehicleId) {
+    const vehicle = this.vehicles.find((item) => item.id === vehicleId);
+    return vehicle ? cloneVehicle(vehicle) : null;
+  }
+
   hasCredit(userId, amount) {
     const user = this.getUser(userId);
     if (!user) return false;
@@ -128,66 +162,73 @@ class MockAuctionStore {
     return availableCredit >= amount;
   }
 
-  /**
-   * Update user's credit used
-   * @param {string} userId
-   * @param {number} previousBid - the user's previous bid amount to release
-   * @param {number} newBid - the new bid amount to reserve
-   */
   updateUserCredit(userId, previousBid, newBid) {
     const user = this.getUser(userId);
-    if (!user) return;
+    if (!user) return null;
 
-    // Release previous bid credit and reserve new bid credit
-    user.creditUsed = user.creditUsed - previousBid + newBid;
+    user.creditUsed = Math.max(0, user.creditUsed - previousBid + newBid);
+    return createUserSnapshot(user);
   }
 
-  /**
-   * Advance to the next vehicle after a 10-second delay
-   * @returns {boolean} true if advanced, false if no more vehicles
-   */
+  recordBid(vehicleId, bid) {
+    const vehicle = this.vehicles.find((item) => item.id === vehicleId);
+    if (!vehicle) return null;
+
+    vehicle.bids.push({ ...bid });
+    return cloneVehicle(vehicle);
+  }
+
+  markVehicleUpdated(vehicle, timestamp = Date.now()) {
+    vehicle.version += 1;
+    vehicle.updatedAt = timestamp;
+    this.snapshotVersion += 1;
+    return cloneVehicle(vehicle);
+  }
+
   advanceToNextVehicle() {
+    const currentVehicle = this.getCurrentVehicle();
+    if (!currentVehicle) {
+      return { advanced: false, currentVehicle: null, snapshot: this.getSnapshot() };
+    }
+
     if (this.currentVehicleIndex >= this.vehicles.length - 1) {
       this.state = AuctionState.ENDED;
-      return false;
+      this.snapshotVersion += 1;
+      return {
+        advanced: false,
+        currentVehicle: null,
+        snapshot: this.getSnapshot()
+      };
     }
 
-    // Mark current vehicle as complete
-    const currentVehicle = this.getCurrentVehicle();
-    if (currentVehicle) {
-      currentVehicle.state = VehicleState.SOLD;
-    }
+    currentVehicle.state = VehicleState.SOLD;
+    this.currentVehicleIndex += 1;
 
-    // Move to next vehicle
-    this.currentVehicleIndex++;
     const nextVehicle = this.getCurrentVehicle();
     if (nextVehicle) {
       nextVehicle.state = VehicleState.ACTIVE;
+      this.markVehicleUpdated(nextVehicle);
+    } else {
+      this.snapshotVersion += 1;
     }
 
-    return true;
+    return {
+      advanced: true,
+      currentVehicle: nextVehicle ? cloneVehicle(nextVehicle) : null,
+      snapshot: this.getSnapshot()
+    };
   }
 
-  /**
-   * Returns a serializable snapshot for client hydration
-   * @returns {object}
-   */
   getSnapshot() {
     return {
       customerId: this.customerId,
       eventId: this.eventId,
       state: this.state,
-      users: this.users.map(u => ({
-        id: u.id,
-        badge: u.badge,
-        name: u.name,
-        creditLimit: u.creditLimit,
-        creditUsed: u.creditUsed,
-        availableCredit: u.creditLimit - u.creditUsed
-      })),
-      vehicles: this.vehicles,
+      snapshotVersion: this.snapshotVersion,
+      users: this.users.map(createUserSnapshot),
+      vehicles: this.vehicles.map(cloneVehicle),
       currentVehicleIndex: this.currentVehicleIndex,
-      currentVehicle: this.getCurrentVehicle()
+      currentVehicle: this.getCurrentVehicle() ? cloneVehicle(this.getCurrentVehicle()) : null
     };
   }
 }

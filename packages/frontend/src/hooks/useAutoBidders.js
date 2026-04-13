@@ -62,7 +62,7 @@ export const useAutoBidders = (enabled = true) => {
           // 70% chance to bid (makes it more realistic/competitive)
           if (Math.random() < 0.7) {
             console.log(`Auto-bidder ${userId} placing bid: $${nextBid}`);
-            await placeBid(userId, nextBid);
+            await placeBid(userId, nextBid, { optimistic: false });
           }
 
           // Schedule next bid

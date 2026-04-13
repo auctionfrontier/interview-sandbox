@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "test": "tap"
+    "test": "tap --disable-coverage"
   },
   "dependencies": {
     "cors": "^2.8.6",

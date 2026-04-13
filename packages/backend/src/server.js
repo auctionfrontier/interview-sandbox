@@ -3,13 +3,17 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 const { createServer } = require("node:http");
 const { Server: SocketIOServer } = require("socket.io");
-// If containerization is available, can add these in
 // const { mysqlPool } = require("./config/mysql");
 // const { redisClient } = require("./config/redis");
 const { createAuctionEngine } = require("./auctionEngine");
 const { MockAuctionStore } = require("./mockAuctionStore");
 
 dotenv.config();
+
+const EVENT_DELAY_RANGE_MS = [40, 260];
+const VEHICLE_ADVANCE_DELAY_MS = 5000;
+const randomBetween = (min, max) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
 
 // Express API and Socket.IO share the same HTTP server instance.
 const app = express();
@@ -55,6 +59,17 @@ const io = new SocketIOServer(httpServer, {
 // In-memory auction state for the interview exercise.
 const store = new MockAuctionStore();
 const engine = createAuctionEngine(store);
+const emitWithJitter = (eventName, payload) => {
+  const delay = randomBetween(...EVENT_DELAY_RANGE_MS);
+
+  setTimeout(() => {
+    io.emit(eventName, {
+      ...payload,
+      emittedAt: Date.now(),
+      transportDelayMs: delay
+    });
+  }, delay);
+};
 
 /**
  * GET /auction - Get current auction state
@@ -71,19 +86,19 @@ app.get("/auction", (_req, res) => {
 /**
  * POST /bid - Place a bid on the current vehicle
  *
- * Body: { userId: string, amount: number }
+ * Body: { userId: string, amount: number, requestId?: string }
  *
- * This is the main endpoint the interview candidate needs to implement.
- * It should:
- * 1. Validate the bid
- * 2. Process the bid through the auction engine
- * 3. Broadcast updates via WebSocket
- * 4. Return appropriate response
+ * The transport is intentionally more realistic than v1:
+ * 1. The command path is REST and returns an authoritative snapshot
+ * 2. The event path is jittered via WebSocket to simulate late/out-of-order updates
+ * 3. Clients must reconcile optimistic local state against both
  */
 app.post("/bid", async (req, res) => {
   try {
-    const { userId, amount } = req.body;
-    console.log(`\n[BID RECEIVED] userId: ${userId}, amount: $${amount}`);
+    const { userId, amount, requestId, expectedVersion } = req.body;
+    console.log(
+      `\n[BID RECEIVED] userId: ${userId}, amount: $${amount}, requestId: ${requestId || "auto"}`
+    );
 
     // Basic validation
     if (!userId || typeof amount !== "number") {
@@ -93,35 +108,34 @@ app.post("/bid", async (req, res) => {
       });
     }
 
-    // TODO: Interview candidate implements this in auctionEngine.applyBid()
     console.log("[BID] Calling engine.applyBid()...");
-    const result = engine.applyBid({ userId, amount });
+    const result = await engine.applyBid({ userId, amount, requestId, expectedVersion });
     console.log("[BID RESULT]", result);
 
     if (result.accepted) {
-      // Broadcast bid update to all connected clients
-      io.emit("auction:bid-update", {
+      emitWithJitter("auction:bid-update", {
+        requestId: result.requestId,
         vehicle: result.vehicle,
-        user: result.user,
+        users: result.users,
+        snapshotVersion: result.snapshotVersion,
         timestamp: Date.now()
       });
 
-      // If vehicle was sold, schedule advancement to next vehicle
-      if (result.vehicle.winner) {
+      if (result.sold) {
         setTimeout(() => {
-          const advanced = store.advanceToNextVehicle();
-          if (advanced) {
-            io.emit("auction:vehicle-advance", {
-              currentVehicle: store.getCurrentVehicle(),
-              currentVehicleIndex: store.currentVehicleIndex,
+          const advanceResult = store.advanceToNextVehicle();
+          if (advanceResult.advanced) {
+            emitWithJitter("auction:vehicle-advance", {
+              snapshot: advanceResult.snapshot,
               timestamp: Date.now()
             });
           } else {
-            io.emit("auction:ended", {
+            emitWithJitter("auction:ended", {
+              snapshot: advanceResult.snapshot,
               timestamp: Date.now()
             });
           }
-        }, 10000); // 10 second delay before advancing
+        }, VEHICLE_ADVANCE_DELAY_MS);
       }
     }
 
@@ -157,7 +171,11 @@ httpServer.listen(port, () => {
 });
 
 process.on("SIGINT", async () => {
-  await redisClient.quit();
-  await mysqlPool.end();
+  if (typeof redisClient !== "undefined") {
+    await redisClient.quit();
+  }
+  if (typeof mysqlPool !== "undefined") {
+    await mysqlPool.end();
+  }
   process.exit(0);
 });

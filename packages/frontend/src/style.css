@@ -73,6 +73,26 @@ body {
   font-weight: 600;
 }
 
+.sync-chip,
+.refresh-button {
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(15, 23, 42, 0.35);
+  color: #e2e8f0;
+  font-size: 0.82rem;
+}
+
+.refresh-button {
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.refresh-button:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
 .simulation-toggle {
   display: flex;
   align-items: center;
@@ -121,6 +141,44 @@ body {
   padding: 24px;
   gap: 24px;
   overflow-y: auto;
+}
+
+.status-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  border-radius: 12px;
+  background: #0f172a;
+  border: 1px solid #1e293b;
+  color: #e2e8f0;
+}
+
+.status-card-label {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.status-card-neutral {
+  border-color: #334155;
+}
+
+.status-card-pending {
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.15);
+}
+
+.status-card-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.15);
 }
 
 /* Vehicle Section */
@@ -336,6 +394,62 @@ body {
   color: #78350f;
 }
 
+.events-panel {
+  background: #0f172a;
+  border-radius: 12px;
+  padding: 20px 24px;
+  color: #f8fafc;
+}
+
+.events-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.events-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.events-header span {
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.event-item {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(30, 41, 59, 0.8);
+}
+
+.event-item.muted {
+  color: #94a3b8;
+}
+
+.event-type {
+  color: #93c5fd;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.event-detail {
+  color: #e2e8f0;
+}
+
 /* Loading State */
 .loading {
   display: flex;
@@ -348,6 +462,10 @@ body {
 
 /* Responsive */
 @media (max-width: 768px) {
+  .status-strip {
+    grid-template-columns: 1fr;
+  }
+
   .bid-display {
     grid-template-columns: 1fr;
   }
@@ -367,6 +485,15 @@ body {
   .auction-info {
     flex-direction: column;
     gap: 8px;
+  }
+
+  .events-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .event-item {
+    grid-template-columns: 1fr;
   }
 }
 

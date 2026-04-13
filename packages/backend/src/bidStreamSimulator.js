@@ -16,7 +16,7 @@ const startBidStreamSimulator = ({
   bidders = defaultBidders,
   onResult
 }) => {
-  const timer = setInterval(() => {
+  const timer = setInterval(async () => {
     const snapshot = engine.getSnapshot();
     const currentVehicle = snapshot.currentVehicle;
     if (!currentVehicle) return;
@@ -36,7 +36,7 @@ const startBidStreamSimulator = ({
     };
 
     try {
-      const result = engine.applyBid(bid);
+      const result = await engine.applyBid(bid);
       if (onResult) onResult(result);
     } catch {
       // Swallow errors so the simulator doesn't crash the server while logic is incomplete.
